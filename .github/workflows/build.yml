@@ -9,10 +9,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: install arduino-cli
+      -       - name: install arduino-cli
         run: |
+          export PATH="$PWD/bin:$PATH"
           curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
           echo "$PWD/bin" >> $GITHUB_PATH
+          arduino-cli version
           arduino-cli config init --overwrite
 
       - name: fetch core + tools (direct files)
