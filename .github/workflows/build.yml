@@ -9,22 +9,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Platform Zip
+      - name: Find & Download Live Platform
         run: |
           set -e
-          URL_MAIN="https://github.com/rzeldent/platform-realtek-ameba/archive/refs/heads/main.zip"
-          URL_MASTER="https://github.com/rzeldent/platform-realtek-ameba/archive/refs/heads/master.zip"
+          # ищем на гитхабе репозитории с PlatformIO платформой для амебы
+          REPOS=$(curl -s "https://api.github.com/search/repositories?q=platform-realtek-ameba+OR+platformio-ameba" | jq -r '.items[].full_name' | head -n 5)
           
-          echo "trying main..."
-          if curl -fsSL -o platform.zip "$URL_MAIN"; then
-             echo "got main"
-             unzip -q platform.zip
-             mv platform-realtek-ameba-main platform-realtek-ameba
-          else
-             echo "main failed, trying master..."
-             curl -fsSL -o platform.zip "$URL_MASTER"
-             unzip -q platform.zip
-             mv platform-realtek-ameba-master platform-realtek-ameba
+          if [ -z "$REPOS" ]; then
+            echo "API ничего не нашёл. пробуем rzeldent напрямую..."
+            REPOS="rzeldent/platform-realtek-ameba"
+          fi
+          
+          FOUND=0
+          for repo in $REPOS; do
+            echo "--- пробуем $repo"
+            # узнаём дефолтную ветку
+            BRANCH=$(curl -s "https://api.github.com/repos/$repo" | jq -r '.default_branch')
+            URL="https://github.com/$repo/archive/refs/heads/$BRANCH.zip"
+            echo "качаем $URL"
+            if curl -fsSL -o platform.zip "$URL"; then
+               unzip -q platform.zip
+               DIR=$(ls -d */ | grep -i ameba | head -1)
+               if [ -n "$DIR" ]; then
+                 mv "$DIR" platform-realtek-ameba
+                 echo "УСПЕХ: скачали $repo"
+                 FOUND=1
+                 break
+               fi
+            fi
+          done
+          
+          if [ $FOUND -eq 0 ]; then
+            echo "Ни один репозиторий не подошёл."
+            exit 1
           fi
 
       - name: Set up Python
