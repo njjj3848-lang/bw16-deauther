@@ -9,34 +9,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Find & Download Live Platform
-        run: |
-          set -e
-          REPO="rzeldent/platform-realtek-ameba"
-          BRANCH=$(curl -s "https://api.github.com/repos/$REPO" | jq -r '.default_branch')
-          URL="https://github.com/$REPO/archive/refs/heads/$BRANCH.zip"
-          curl -fsSL -o platform.zip "$URL"
-          unzip -q platform.zip
-          DIR=$(ls -d */ | grep -i ameba | head -1)
-          mv "$DIR" platform-realtek-ameba
-
-      - name: Show available boards
-        run: |
-          echo "=== boards available in platform ==="
-          ls platform-realtek-ameba/boards/ || true
-
-      - name: Auto-detect board ID
-        run: |
-          set -e
-          BOARD=$(ls platform-realtek-ameba/boards/ | grep -iE "8720|bw16|rtl" | head -1 | sed 's/\.json$//')
-          if [ -z "$BOARD" ]; then
-            echo "не нашёл 8720 в boards, беру первую:"
-            BOARD=$(ls platform-realtek-ameba/boards/ | head -1 | sed 's/\.json$//')
-          fi
-          echo "=> выбран board = $BOARD"
-          sed -i "s/^board = .*/board = $BOARD/" platformio.ini
-          cat platformio.ini
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
