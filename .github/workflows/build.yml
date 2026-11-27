@@ -14,11 +14,18 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
           echo "$PWD/bin" >> $GITHUB_PATH
 
-      - name: core index
+      - name: get board index from ameba repo
         run: |
+          git clone --depth 1 https://github.com/ambiot/ambd_arduino.git ameba-src
+          INDEX=$(find ameba-src -name "package_realtek.com_ameba_index.json" | head -n 1)
+          if [ -z "$INDEX" ]; then
+            echo "index not found in repo, tree:"
+            find ameba-src -maxdepth 3 -type f | head -n 50
+            exit 1
+          fi
+          echo "using index: $INDEX"
           arduino-cli config init --overwrite
-          arduino-cli config add board_manager.additional_urls \
-            https://github.com/ambiot/ambd_arduino/raw/master/Arduino_package/package_realtek.com_ameba_index.json
+          arduino-cli config add board_manager.additional_urls "file://$PWD/$INDEX"
           arduino-cli core update-index
 
       - name: install core
