@@ -9,94 +9,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: install tooling
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
-          sudo cp ./bin/arduino-cli /usr/local/bin/
-          arduino-cli version
-          arduino-cli config init --overwrite
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: find working core index
-        run: |
-          set -euo pipefail
-          CANDIDATES=(
-            "Seeed-Studio/ambd_arduino/master"
-            "Seeed-Studio/ambd_arduino/main"
-            "sigmdel/ambd_arduino/master"
-            "ambiot/ambd_arduino/dev"
-            "ambiot/ambd_arduino/master"
-            "ambiot/ambd_arduino/main"
-            "Ameba-Net/ambd_arduino/main"
-            "Ameba-Net/ambd_arduino/master"
-            "Ameba-Net/ambd_arduino/dev"
-            "tarikkirgin/ambd_arduino/master"
-            "rzeldent/ambd_arduino/master"
-          )
-          FOUND=""
-          for entry in "${CANDIDATES[@]}"; do
-            repo=$(echo "$entry" | cut -d/ -f1,2)
-            br=$(echo "$entry" | cut -d/ -f3)
-            for f in "Arduino_package/package_realtek.com_ameba_index.json" "package_realtek.com_ameba_index.json"; do
-              url="https://raw.githubusercontent.com/$repo/$br/$f"
-              echo "→ try: $url"
-              if curl -fsSL --max-time 20 -o /tmp/idx.json "$url" 2>/dev/null; then
-                if [ -s /tmp/idx.json ] && python3 -c "import json,sys;json.load(open('/tmp/idx.json'))" 2>/dev/null; then
-                  echo "✓ WORKS: $url"
-                  FOUND="$url"
-                  break 2
-                fi
-              fi
-            done
-          done
-          if [ -z "$FOUND" ]; then
-            echo "✗ none worked — dumping what exists:"
-            for entry in "${CANDIDATES[@]}"; do
-              repo=$(echo "$entry" | cut -d/ -f1,2)
-              echo "── repo $repo:"
-              curl -fsSL "https://api.github.com/repos/$repo/contents/Arduino_package" 2>/dev/null \
-                | grep '"name"' | head -10 || true
-            done
-            exit 1
-          fi
-          echo "$FOUND" > /tmp/found_url.txt
-          arduino-cli config add board_manager.additional_urls "$FOUND"
-          arduino-cli core update-index
+      - name: Install PlatformIO
+        run: pip install -U platformio
 
-      - name: install core
-        run: |
-          set -e
-          arduino-cli core install realtek:ameba 2>&1 | tee /tmp/core_install.log
-          echo "--- installed:"
-          arduino-cli core list
-
-      - name: install U8g2
-        run: arduino-cli lib install U8g2
-
-      - name: find board fqbn
-        id: fqbn
-        run: |
-          set -e
-          echo "--- boards for realtek:ameba:"
-          arduino-cli board listall realtek:ameba 2>&1 | tee /tmp/boards.txt
-          FQBN=$(grep -iE "8720|bw16|rtl8720" /tmp/boards.txt | awk '{print $1}' | head -1 || true)
-          if [ -z "$FQBN" ]; then
-            FQBN=$(grep -iE "^ameba|:.*ameba" /tmp/boards.txt | awk '{print $1}' | head -1 || true)
-          fi
-          echo "chosen FQBN: $FQBN"
-          echo "fqbn=$FQBN" >> $GITHUB_OUTPUT
-
-      - name: compile
-        run: |
-          set -e
-          FQBN="${{ steps.fqbn.outputs.fqbn }}"
-          if [ -z "$FQBN" ]; then
-            echo "no FQBN, dumping board list:"; cat /tmp/boards.txt; exit 1
-          fi
-          arduino-cli compile -b "$FQBN" --output-dir out ./bw16_deauther
-          ls -la out
+      - name: Build firmware
+        run: pio run -e bw16
 
       - uses: actions/upload-artifact@v4
         with:
           name: bw16-firmware
-          path: out/*.bin
-          if-no-files-found: error
+          path: .pio/build/bw16/firmware.bin
