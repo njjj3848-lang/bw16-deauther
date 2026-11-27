@@ -9,11 +9,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fix git auth (skip prompt)
-        run: |
-          git config --global url."https://github.com/".insteadOf "git+https://github.com/"
-          git config --global url."https://github.com/".insteadOf "https://github.com/"
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
