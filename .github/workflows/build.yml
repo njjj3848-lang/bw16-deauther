@@ -11,9 +11,21 @@ jobs:
 
       - name: Download Platform Zip
         run: |
-          curl -fsSL -o platform.zip https://github.com/rzeldent/platform-realtek-ameba/archive/refs/heads/main.zip
-          unzip -q platform.zip
-          mv platform-realtek-ameba-main platform-realtek-ameba
+          set -e
+          URL_MAIN="https://github.com/rzeldent/platform-realtek-ameba/archive/refs/heads/main.zip"
+          URL_MASTER="https://github.com/rzeldent/platform-realtek-ameba/archive/refs/heads/master.zip"
+          
+          echo "trying main..."
+          if curl -fsSL -o platform.zip "$URL_MAIN"; then
+             echo "got main"
+             unzip -q platform.zip
+             mv platform-realtek-ameba-main platform-realtek-ameba
+          else
+             echo "main failed, trying master..."
+             curl -fsSL -o platform.zip "$URL_MASTER"
+             unzip -q platform.zip
+             mv platform-realtek-ameba-master platform-realtek-ameba
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
