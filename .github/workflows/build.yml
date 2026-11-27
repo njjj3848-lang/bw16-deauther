@@ -9,6 +9,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download Platform Zip
+        run: |
+          curl -fsSL -o platform.zip https://github.com/rzeldent/platform-realtek-ameba/archive/refs/heads/main.zip
+          unzip -q platform.zip
+          mv platform-realtek-ameba-main platform-realtek-ameba
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
