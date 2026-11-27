@@ -13,27 +13,73 @@ jobs:
         run: |
           curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
           echo "$PWD/bin" >> $GITHUB_PATH
-
-      - name: core index
-        run: |
           arduino-cli config init --overwrite
-          arduino-cli config add board_manager.additional_urls \
-            https://github.com/Ameba-Net/ambd_arduino/raw/master/Arduino_package/package_realtek.com_ameba_index.json
-          arduino-cli core update-index
 
-      - name: install core
-        run: arduino-cli core install realtek:ameba
+      - name: fetch core + tools (direct files)
+        run: |
+          set -e
+          CORE=$HOME/.arduino15/packages/realtek/hardware/ameba/3.1.6
+          TOOLS=$HOME/.arduino15/packages/realtek/tools/ameba/1.1.3
+          mkdir -p $CORE $TOOLS
 
-      - name: libs
+          fetch() {
+            local out=$1; shift
+            for url in "$@"; do
+              echo "  try: $url"
+              if curl -fsSL -o "$out" "$url"; then
+                local sz=$(stat -c%s "$out")
+                echo "  got: $sz bytes"
+                if [ "$sz" -gt 1000000 ]; then return 0; fi
+                echo "  looks like stub, head:"; head -3 "$out" || true
+              fi
+            done
+            return 1
+          }
+
+          fetch /tmp/core.tar.gz \
+            "https://github.com/ambiot/ambd_arduino/raw/master/Arduino_package/release/ameba_d-3.1.6-build20230412.tar.gz" \
+            "https://github.com/Ameba-Net/ambd_arduino/raw/master/Arduino_package/release/ameba_d-3.1.6-build20230412.tar.gz"
+
+          fetch /tmp/tools.tar.gz \
+            "https://github.com/ambiot/ambd_arduino/raw/master/Arduino_package/release/ameba_d_tools_linux-1.1.3.tar.gz" \
+            "https://github.com/Ameba-Net/ambd_arduino/raw/master/Arduino_package/release/ameba_d_tools_linux-1.1.3.tar.gz"
+
+          echo "--- extract core"
+          tar -xzf /tmp/core.tar.gz -C $CORE
+          if [ "$(ls -A $CORE | wc -l)" -eq 1 ] && [ -d "$CORE"/*/ ]; then
+            inner=$(ls -A $CORE | head -1)
+            mv $CORE/$inner/* $CORE/ ; rmdir $CORE/$inner
+          fi
+          ls $CORE
+
+          echo "--- extract tools"
+          tar -xzf /tmp/tools.tar.gz -C $TOOLS
+          if [ "$(ls -A $TOOLS | wc -l)" -eq 1 ] && [ -d "$TOOLS"/*/ ]; then
+            inner=$(ls -A $TOOLS | head -1)
+            mv $TOOLS/$inner/* $TOOLS/ ; rmdir $TOOLS/$inner
+          fi
+          ls $TOOLS
+
+      - name: diagnose repo (если что-то не так)
+        if: always()
+        run: |
+          echo "=== files in Arduino_package: ==="
+          curl -fsSL https://api.github.com/repos/ambiot/ambd_arduino/contents/Arduino_package | grep '"name"' || true
+          echo "=== files in release: ==="
+          curl -fsSL https://api.github.com/repos/ambiot/ambd_arduino/contents/Arduino_package/release | grep '"name"' || true
+
+      - name: install U8g2
         run: arduino-cli lib install U8g2
 
       - name: list boards
-        run: arduino-cli board listall | grep -i 8720 || true
+        run: |
+          arduino-cli board listall 2>&1 | grep -iE "8720|ameba" || arduino-cli board listall 2>&1 | head -40
 
       - name: compile
         run: |
           arduino-cli compile \
             -b realtek:ameba:ameba_rtl8720dn \
+            --build-path /tmp/build \
             --output-dir out ./bw16_deauther
 
       - uses: actions/upload-artifact@v4
