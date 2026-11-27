@@ -9,6 +9,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download Platform ZIP
+        run: |
+          set -e
+          REPOS="Seeed-Studio/platform-realtek-ameba rzeldent/platform-realtek-ameba Ameba-Net/platform-realtek-ameba"
+          for repo in $REPOS; do
+            for branch in main master; do
+              URL="https://github.com/$repo/archive/refs/heads/$branch.zip"
+              echo "Пробуем $URL"
+              if curl -fsSL -o platform.zip "$URL"; then
+                echo "УСПЕХ: скачали $repo/$branch"
+                unzip -q platform.zip
+                mv platform-realtek-ameba-* platform-realtek-ameba
+                exit 0
+              fi
+            done
+          done
+          echo "Ни один архив не найден"
+          exit 1
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
